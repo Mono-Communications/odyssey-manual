@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 
 <head>
@@ -2270,7 +2270,60 @@
 
         > 이 파트는 제품 내부 동작·자사 모니터링 플랫폼 연동·로그 기반 장애 추적을 다룹니다. 고객사가 직접 건드릴 일은 거의 없고, ㈜모노커뮤니케이션즈 기술지원팀이 초기 설치·장애 대응 시 참고합니다.
 
-        <!--
+
+        ## 22. Poseidon 모니터링 연동 (HA 전용)
+
+        **Poseidon**은 ㈜모노커뮤니케이션즈가 운영하는 통합 모니터링 플랫폼입니다. Odyssey HA 프로파일은 Poseidon 클라우드와 연동하여 인스턴스 상태, 시작/종료 알림, 에러 알림, KT
+        사용량 등을 주기적으로 보고합니다.
+
+        ```yaml
+        poseidon:
+        url: http://{{MONO_IP}}:{{MONO_PORT}}/api/v1/odyssey-instances
+        auth-key: {{발급받은 Auth 키}}
+        contact-email: {{email}}
+        heartbeat:
+        interval-ms: 30000
+        ```
+
+        | 옵션 | 설명 |
+        |---|---|
+        | `poseidon.url` | Poseidon API 엔드포인트 URL. 운영 환경 별로 별도 발급. |
+        | `poseidon.auth-key` | Poseidon 인증 키. 인스턴스별 발급된 값을 입력. |
+        | `poseidon.contact-email` | 장애 발생 시 연락받을 담당자 이메일. (고객사)|
+        | `poseidon.heartbeat.interval-ms` | 하트비트 전송 주기. 기본 30,000 (30초). |
+
+        &gt; ※ Poseidon 연동을 사용하지 않는 경우 본 영역을 주석 처리하거나 `url`, `auth-key`를 빈 값으로 두면 하트비트가 비활성화됩니다.
+
+        &gt; ※ Poseidon 연동을 사용하는 경우 **고객사 방화벽에 Poseidon 서버 IP를 등록**해 주셔야 합니다. Odyssey가 주기적으로 외부의 Poseidon
+        클라우드(`poseidon.url` 항목에 명시된 호스트)로 HTTPS 요청(하트비트, 알림)을 송신해야 하므로 outbound 통신이 차단되어 있는 경우 연동이 동작하지 않습니다. 정확한 IP 및
+        포트 정보는 별도 안내드립니다.
+
+        ---
+
+        ## 23. Odyssey 로그 상세
+
+        Odyssey의 로그는 `log/` 폴더에 출력되며, 일별로 압축되어 `log_backup/` 폴더에 보관됩니다. 주요 로그 파일은 다음과 같습니다.
+
+        | 로그 파일 | 내용 |
+        |---|---|
+        | `odyssey.log` | Odyssey 전체 동작, DB 연동, 모듈 구동 관련 로그 |
+        | `odyssey_kt.log` | KT 크로샷 연동 로그 (SMS/LMS/MMS) |
+        | `odyssey_rcs.log` | KT RCS Hermes 연동 로그 |
+        | `odyssey_cpaas.log` | CPaaS API 연동 로그 |
+        | `odyssey_mnwise.log` | 엠앤와이즈 카카오 연동 로그 |
+        | `odyssey_ha.log` | HA 이중화 / DB Lease 관련 로그 |
+        | `odyssey_pipeline.log` | Pipeline (이벤트 드리븐) 동작 로그 |
+        | `error.log` | 에러 전용 로그 (장애 발생 시 우선 확인) |
+
+        &gt; ※ 로그 파일 명은 logback 설정에 따라 환경별로 다를 수 있습니다. 정확한 파일명은 운영 환경의 `log/` 폴더를 확인하시기 바랍니다.
+
+        ---
+
+        *Odyssey 통합 매뉴얼 v1 — © ㈜모노커뮤니케이션즈*
+    </template>
+
+    <!-- [22. Pipeline MODE (COMMENTED OUT) - restore by moving the block below back inside the template] -->
+    <!--
 ---
 
 ## 22. Pipeline 모드 (HA 전용)
@@ -2344,57 +2397,8 @@ pipeline:
 | `ttl-ms` | 재시도 가능 TTL. 이 시간을 넘긴 항목은 재시도하지 않음. (단위: 밀리초) |
 
 ---
--->
-        ## 22. Poseidon 모니터링 연동 (HA 전용)
+    -->
 
-        **Poseidon**은 ㈜모노커뮤니케이션즈가 운영하는 통합 모니터링 플랫폼입니다. Odyssey HA 프로파일은 Poseidon 클라우드와 연동하여 인스턴스 상태, 시작/종료 알림, 에러 알림, KT
-        사용량 등을 주기적으로 보고합니다.
-
-        ```yaml
-        poseidon:
-        url: http://{{MONO_IP}}:{{MONO_PORT}}/api/v1/odyssey-instances
-        auth-key: {{발급받은 Auth 키}}
-        contact-email: {{email}}
-        heartbeat:
-        interval-ms: 30000
-        ```
-
-        | 옵션 | 설명 |
-        |---|---|
-        | `poseidon.url` | Poseidon API 엔드포인트 URL. 운영 환경 별로 별도 발급. |
-        | `poseidon.auth-key` | Poseidon 인증 키. 인스턴스별 발급된 값을 입력. |
-        | `poseidon.contact-email` | 장애 발생 시 연락받을 담당자 이메일. (고객사)|
-        | `poseidon.heartbeat.interval-ms` | 하트비트 전송 주기. 기본 30,000 (30초). |
-
-        &gt; ※ Poseidon 연동을 사용하지 않는 경우 본 영역을 주석 처리하거나 `url`, `auth-key`를 빈 값으로 두면 하트비트가 비활성화됩니다.
-
-        &gt; ※ Poseidon 연동을 사용하는 경우 **고객사 방화벽에 Poseidon 서버 IP를 등록**해 주셔야 합니다. Odyssey가 주기적으로 외부의 Poseidon
-        클라우드(`poseidon.url` 항목에 명시된 호스트)로 HTTPS 요청(하트비트, 알림)을 송신해야 하므로 outbound 통신이 차단되어 있는 경우 연동이 동작하지 않습니다. 정확한 IP 및
-        포트 정보는 별도 안내드립니다.
-
-        ---
-
-        ## 23. Odyssey 로그 상세
-
-        Odyssey의 로그는 `log/` 폴더에 출력되며, 일별로 압축되어 `log_backup/` 폴더에 보관됩니다. 주요 로그 파일은 다음과 같습니다.
-
-        | 로그 파일 | 내용 |
-        |---|---|
-        | `odyssey.log` | Odyssey 전체 동작, DB 연동, 모듈 구동 관련 로그 |
-        | `odyssey_kt.log` | KT 크로샷 연동 로그 (SMS/LMS/MMS) |
-        | `odyssey_rcs.log` | KT RCS Hermes 연동 로그 |
-        | `odyssey_cpaas.log` | CPaaS API 연동 로그 |
-        | `odyssey_mnwise.log` | 엠앤와이즈 카카오 연동 로그 |
-        | `odyssey_ha.log` | HA 이중화 / DB Lease 관련 로그 |
-        | `odyssey_pipeline.log` | Pipeline (이벤트 드리븐) 동작 로그 |
-        | `error.log` | 에러 전용 로그 (장애 발생 시 우선 확인) |
-
-        &gt; ※ 로그 파일 명은 logback 설정에 따라 환경별로 다를 수 있습니다. 정확한 파일명은 운영 환경의 `log/` 폴더를 확인하시기 바랍니다.
-
-        ---
-
-        *Odyssey 통합 매뉴얼 v1 — © ㈜모노커뮤니케이션즈*
-    </template>
 
     <script>
         // ===== Marked.js =====
