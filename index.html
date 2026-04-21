@@ -2414,12 +2414,20 @@ pipeline:
 
         // ===== Markdown source =====
         const template = document.getElementById('markdown-source');
-        const mdSource = template.innerHTML
+        const rawMd = template.innerHTML
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&amp;/g, '&')
             .replace(/&quot;/g, '"')
             .replace(/&#x27;/g, "'");
+
+        // HTML 들여쓰기로 인한 선행 공백 제거 (4칸 이상 공백 = 마크다운 코드블럭 오인식 방지)
+        const lines = rawMd.split('\n');
+        const nonEmptyLines = lines.filter(l => l.trim().length > 0);
+        const minIndent = nonEmptyLines.length
+            ? nonEmptyLines.reduce((min, l) => Math.min(min, l.match(/^(\s*)/)[1].length), Infinity)
+            : 0;
+        const mdSource = lines.map(l => l.slice(minIndent)).join('\n');
 
         const renderedHtml = marked.parse(mdSource);
         document.getElementById('rendered-content').innerHTML = renderedHtml;
