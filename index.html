@@ -668,8 +668,8 @@
         # Odyssey 통합 매뉴얼
 
         > **버전**: v1
-        > **작성일**: 2026.04.08
-        > **고객센터**: 02-333-7223 (내선 1번)
+        > **작성일**: 2026.04.27
+        > **고객센터**: 02-333-7223
 
         ---
 
@@ -769,7 +769,7 @@
         | `auth/` | KT 크로샷 세션 인증파일(`.cert`) 폴더 |
         | `upload/` | RCS MMS 첨부 이미지 파일 폴더 (자동 업로드 사용 시) |
         | `start.sh` / `stop.sh` | 시작 / 종료 스크립트 (Linux) |
-        | `logs/` (자동 생성) | 실행 로그 폴더 — `odyssey-app.log` 또는 `odyssey-pipeline.log` |
+        | `log/` (자동 생성) | 실행 로그 폴더 — `agent.log`(전체 로그), `error.log`, `router.log` 등 모듈별 파일, `odyssey-app.out` 또는 `odyssey-pipeline.out`(JVM 콘솔 안전망) |
         | `pids/` (자동 생성) | 실행 중 프로세스 PID 파일 폴더 |
         | `log_backup/` (자동 생성) | 일별 압축 로그 백업 |
         | `backup/` (자동 생성) | Web UI 설정 변경 백업 |
@@ -873,10 +873,10 @@
         common:
           tables:
             fetch-count:
-              sms: 260
-              lms: 300
-              mms: 40
-              rcs: 120
+              sms: 200
+              lms: 200
+              mms: 50
+              rcs: 60
               kakao: 400
               fetch: 1000
         ```
@@ -897,10 +897,10 @@
             - seq: 1
               rcs-ip: rcs.xroshot.com
               sp-id: {{xroshot_id}}
-              sp-pwd: {{xroshot_pw}}      # 암호화 권장
+              sp-pwd: {{xroshot_pw}}      
               end-user: {{user}}
               auth-file: {{cert_file}}    # auth/ 폴더의 .cert 파일명과 일치
-              max-cnt: 200                 # 계약 한도와 일치
+              max-cnt: 200                # 권장
               sms: true
               lms: true
               mms: true
@@ -915,9 +915,9 @@
               send-url: https://agency.hermes.kt.com/corp/v1
               report-url: https://query.hermes.kt.com/corp/v1
               rcs-id: {{rcs_id}}
-              rcs-secret: {{rcs_pw}}       # 암호화 권장
+              rcs-secret: {{rcs_pw}}       
               agencyid: ktbizrcs
-              max-cnt: 30
+              max-cnt: 30                  # 권장
         ```
 
         #### CPaaS (`transmission.msg = CPAAS` / `rcs = CPAAS` / `kakao = CPAAS`)
@@ -929,9 +929,9 @@
               send-url: https://api.communis.kt.com/cpaas/v2.0
               report-url: https://api.communis.kt.com/cpaas/v2.0
               api-id: {{communis_id}}
-              api-pw: {{communis_pw}}      # 암호화 권장
+              api-pw: {{communis_pw}}      
               sender-key: {{kakao_senderkey}}
-              max-cnt: 20
+              max-cnt: 20                  # 권장
         ```
 
         #### 엠앤와이즈 카카오 (`transmission.kakao = MN`)
@@ -952,7 +952,7 @@
 
         ### 3-7. RCS 발송 시 추가 설정 (`common.user`)
 
-        KT RCS 또는 CPaaS RCS로 발송하는 경우 다음 KEY를 입력합니다. RCS 청약 시 발급받습니다.
+        CPaaS RCS로 발송하는 경우 다음 KEY를 입력합니다. RCS 청약 시 발급받습니다.
 
         ```yaml
         common:
@@ -994,7 +994,7 @@
 
         ### Windows
 
-        JAR을 `java -jar`로 직접 실행합니다.
+        현재는 JAR을 `java -jar`로 직접 실행합니다.
 
         ```bat
         :: multi 모드 (엔진 + Web UI)
@@ -1004,9 +1004,11 @@
         java -Xms256m -Xmx512m -server -XX:+UseG1GC -jar odyssey-pipeline-1.0.0-boot.jar --spring.profiles.active=HA
         ```
 
+        > ※ 추후 Windows 전용 인스톨러로 배포 방식이 변경될 예정이며, 인스톨러에서 `start.bat` / `stop.bat` 실행 스크립트를 함께 제공합니다. 인스톨러 배포 이후에는 위 `java -jar` 직접 실행 대신 제공된 bat 파일을 사용하게 됩니다.
+
         ### 정상 기동 확인
 
-        `logs/` 폴더 내 모드별 로그 파일에 다음과 유사한 메시지가 출력됩니다.
+        `log/agent.log`(또는 모드별 `log/odyssey-app.out` / `log/odyssey-pipeline.out`)에 다음과 유사한 메시지가 출력됩니다.
 
         ```text
         Database Driver Load Success.
@@ -1040,7 +1042,7 @@
 
         전체 화면 구성과 사용법은 [20장 Web UI 상세](#20-web-ui-상세)를 참고하세요.
 
-        > ※ pipeline 모드(엔진 단독)에서는 Web UI가 제공되지 않습니다. 결과는 로그(`logs/odyssey-pipeline.log`)와 DB(`ODYSSEY` 테이블의 `RESULT` 컬럼)로 확인합니다.
+        > ※ pipeline 모드(엔진 단독)에서는 Web UI가 제공되지 않습니다. 결과는 로그(`log/agent.log`)와 DB(`ODYSSEY` 테이블의 `RESULT` 컬럼)로 확인합니다.
 
         ---
 
@@ -1067,11 +1069,14 @@
         ### 결과 확인 1 — 로그
 
         ```bash
-        # multi 모드
-        tail -f logs/odyssey-app.log
+        # 전체 로그 (모든 모드)
+        tail -f log/agent.log
 
-        # pipeline 모드
-        tail -f logs/odyssey-pipeline.log
+        # 발송(KT) 채널만 보기
+        tail -f log/send_kt.log
+
+        # 에러만 보기
+        tail -f log/error.log
         ```
 
         발송 성공 시 `Send Success` / `Report Success` 등의 메시지가 출력됩니다.
@@ -1109,7 +1114,7 @@
 
         ### 7-1. DB 접속 실패
 
-        **증상**: `logs/odyssey-app.log`에 `Communications link failure` 또는 `Access denied for user` 에러.
+        **증상**: `log/agent.log`에 `Communications link failure` 또는 `Access denied for user` 에러.
 
         **점검**:
         - `application-HA.yaml`의 `jdbc-url`/`username`/`password` 값 확인
@@ -2515,15 +2520,18 @@
 
         | 로그 파일 | 내용 |
         |---|---|
-        | `odyssey.log` | Odyssey 전체 동작, DB 연동, 모듈 구동 관련 로그 |
-        | `odyssey_kt.log` | KT 크로샷 연동 로그 (SMS/LMS/MMS) |
-        | `odyssey_rcs.log` | KT RCS Hermes 연동 로그 |
-        | `odyssey_cpaas.log` | CPaaS API 연동 로그 |
-        | `odyssey_mnwise.log` | 엠앤와이즈 카카오 연동 로그 |
-        | `odyssey_ha.log` | HA 이중화 / DB Lease 관련 로그 |
-        | `odyssey_pipeline.log` | Pipeline (이벤트 드리븐) 동작 로그 |
+        | `agent.log` | **전체 로그(catch-all)** — 모든 서비스 모듈 + HA 모듈 + Spring/DB 등 전반 |
         | `error.log` | 에러 전용 로그 (장애 발생 시 우선 확인) |
+        | `router.log` | Router 모듈 — 메시지 라우팅, 채널 분기 |
+        | `collect.log` | Collector 모듈 — KT/RCS/카카오 수집 결과 |
+        | `send_kt.log` | KT 크로샷 발송 (SMS/LMS/MMS, legacy socket) |
+        | `send_rcs.log` | KT RCS Hermes 발송 |
+        | `send_kko.log` | 카카오 알림톡/친구톡 발송 |
+        | `report.log` | 리포트 처리 (수신 결과 콜백) |
+        | `cpaas.log` | CPaaS API 발송/리포트 (legacy/kakao/rcs) |
+        | `odyssey-app.out` / `odyssey-pipeline.out` | JVM 콘솔 안전망 — Spring 부트 init, JVM 크래시 등 logback이 못 잡는 출력 |
 
+        > ※ `agent.log`는 모든 모듈 로그를 통합해서 받는 전체 로그입니다. 특정 채널/모듈만 추적하고 싶을 땐 위의 모듈별 파일을 참고하세요.
         > ※ 로그 파일 명은 logback 설정에 따라 환경별로 다를 수 있습니다. 정확한 파일명은 운영 환경의 `log/` 폴더를 확인하시기 바랍니다.
 
         ---
