@@ -181,7 +181,8 @@
             border-radius: 10px;
             padding: 0;
             margin: 1.5rem 0;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
             position: relative;
         }
@@ -738,9 +739,9 @@
 
         | 항목 | 요구 사항 |
         |---|---|
-        | **JDK** | 21 이상 |
-        | **DB** | MySQL 5.7 / 8.0 이상 (UTF-8 환경) |
-        | **OS** | Linux / Windows |
+        | **자바** | **Java 21 이상**. 기본 패키지에 Java 21 JRE 가 동봉되어 있어 별도 설치 없이 그대로 동작합니다. 고객사가 Java 21 을 자체 설치한 환경이라면 패키지에서 `jre/` 폴더를 제거하면 시스템 Java 로 자동 fallback 합니다 (자세히는 [2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre)) |
+        | **DB** | MySQL 5.7 / 8.0 이상 (UTF-8 환경). 다른 DBMS 드라이버는 [2-4 lib 폴더](#2-4-lib-폴더-—-외부-라이브러리) 참고하여 교체 |
+        | **OS** | Linux x64 (glibc) — RHEL / Ubuntu / CentOS 등 일반 엔터프라이즈 배포판. Windows 환경은 별도 인스톨러로 배포 예정 ([4장 실행 / 정지](#4-실행--정지) 참고) |
         | **메모리** | 최소 1GB, 권장 2GB 이상 |
         | **네트워크** | DB 서버 접근, 게이트웨이 IP/PORT outbound 허용 ([21장 게이트웨이 IP / PORT](#21-게이트웨이-ip--port) 참고) |
 
@@ -748,12 +749,12 @@
 
         ## 2. 패키지 구성
 
-        Odyssey는 멀티 모듈 구조로 패키징되며, 운영 모드에 따라 두 가지 형태 중 하나로 배포됩니다.
+        Odyssey는 **자립형 배포 패키지**로 구성됩니다. 시스템 자바, DB 드라이버, 매퍼 쿼리 등 운영 시 자주 바뀌는 영역을 외부 폴더로 분리해, jar 재빌드 없이 운영 환경에서 직접 변경할 수 있습니다.
 
         | 배포 형태 | 실행 jar | 용도 |
         |---|---|---|
         | **`multi`** (UI 포함) | `odyssey-app-1.0.0.jar` | Web UI를 통한 설정·모니터링·로그 관리가 필요한 일반 고객사 |
-        | **`pipeline`** (엔진 단독) | `odyssey-pipeline-1.0.0-boot.jar` | YAML로만 운영하며 Web UI가 필요하지 않은 고객사 |
+        | **`pipeline`** (엔진 단독) | `odyssey-pipeline-1.0.0.jar` | YAML로만 운영하며 Web UI가 필요하지 않은 고객사 |
 
         ### 패키지 폴더 구조
 
@@ -764,8 +765,10 @@
 
         | 항목 | 설명 |
         |---|---|
-        | `odyssey-app-1.0.0.jar` 또는 `odyssey-pipeline-1.0.0-boot.jar` | 모드별 실행 jar (1개) |
-        | `config/` | 환경설정 폴더 — `application-HA.yaml`, `ha.properties` |
+        | `odyssey-app-1.0.0.jar` / `odyssey-pipeline-1.0.0.jar` | 자사 코드 (thin jar — 외부 lib/ 와 함께 동작) |
+        | `lib/` | 외부 라이브러리 폴더 — Spring Boot, JDBC 드라이버, Netty 등 (자세히는 [2-4 lib 폴더](#2-4-lib-폴더-—-외부-라이브러리)) |
+        | `jre/` | 번들 Java 21 JRE — 시스템 자바와 무관하게 동작 (자세히는 [2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre)) |
+        | `config/` | 환경설정 폴더 — `application-HA.yaml`, `ha.properties`, `mapper/` (자세히는 [2-1 config 폴더](#2-1-config-폴더), [2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화)) |
         | `auth/` | KT 크로샷 세션 인증파일(`.cert`) 폴더 |
         | `upload/` | RCS MMS 첨부 이미지 파일 폴더 (자동 업로드 사용 시) |
         | `start.sh` / `stop.sh` | 시작 / 종료 스크립트 (Linux) |
@@ -774,28 +777,194 @@
         | `log_backup/` (자동 생성) | 일별 압축 로그 백업 |
         | `backup/` (자동 생성) | Web UI 설정 변경 백업 |
 
-        ### config 폴더
+        > ※ 자사 코드 jar 는 본체만 포함된 작은 파일(수백 KB)이며, 실제 의존 라이브러리는 외부 `lib/` 폴더에서 로딩됩니다. 드라이버 등 라이브러리 교체 시 jar 재빌드 없이 lib/ 안의 jar 만 교체하면 됩니다.
+
+        ### 2-1. config 폴더
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - config 폴더 내부.png" alt="config 폴더 내부">
-            <div class="screenshot-caption">그림 2. config 폴더 내부 (application-HA.yaml + ha.properties)</div>
+            <div class="screenshot-caption">그림 2. config 폴더 내부 (application-HA.yaml + ha.properties + mapper/)</div>
+        </div>
+
+        | 항목 | 역할 |
+        |---|---|
+        | `application-HA.yaml` | DB, 사용 서비스, 세션, Poseidon 등 모든 운영 설정 |
+        | `ha.properties` | HA 이중화 노드 정보, DB Lease, 로드밸런싱 (HA 운영 시 필수) |
+        | `mapper/` | MyBatis 매퍼 XML — DBMS별 폴더 구성 (자세히는 [2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화)) |
+
+        ### 2-2. config/mapper 폴더 — 매퍼 외부화
+
+        운영 중 SQL 쿼리(메시지 조회, 통계, INSERT 등)를 변경해야 할 때 jar 재빌드 없이 외부 폴더의 XML 만 수정하면 됩니다. 변경 후 재시작이 필요합니다.
+
+        <div class="screenshot-figure">
+            <img src="./images/Odyssey 패키징 - config 폴더 내부 - dbms.png" alt="config/mapper/{dbms}/ 구성">
+            <div class="screenshot-caption">그림 3. config/mapper/&#123;dbms&#125;/ 구성 (현재 mysql 지원)</div>
+        </div>
+
+        DBMS별 폴더 안에 5종의 매퍼 파일이 있습니다.
+
+        <div class="screenshot-figure">
+            <img src="./images/Odyssey 패키징 - config 폴더 내부 - dbms - 쿼리.png" alt="DBMS 폴더 내부 매퍼 파일">
+            <div class="screenshot-caption">그림 4. DBMS 폴더 내부 매퍼 파일 5종</div>
         </div>
 
         | 파일 | 역할 |
         |---|---|
-        | `application-HA.yaml` | DB, 사용 서비스, 세션, Poseidon 등 모든 운영 설정 |
-        | `ha.properties` | HA 이중화 노드 정보, DB Lease, 로드밸런싱 (HA 운영 시 필수) |
+        | `selectQuery.xml` | 메시지 조회 (FETCH) 쿼리 |
+        | `insertQuery.xml` | INSERT 쿼리 |
+        | `updateQuery.xml` | 상태 갱신 쿼리 |
+        | `deleteQuery.xml` | DELETE / 이관 쿼리 |
+        | `table.xml` | 테이블 자동 생성 DDL |
 
-        ### auth 폴더
+        #### 동작 원리 — 외부 우선 + classpath fallback
+
+        Odyssey는 시작 시 매퍼를 다음 순서로 로드합니다.
+
+        1. **외부 우선** — `./config/mapper/{dbms}/*.xml` 에 파일이 1개 이상 있으면 외부 폴더 사용
+        2. **classpath fallback** — 외부 폴더가 비어있거나 누락되면 jar 안에 동봉된 기본 매퍼 사용 (안전망)
+
+        시작 로그에서 어느 경로가 사용 중인지 확인할 수 있습니다.
+
+        ```text
+        # 외부 폴더 사용 시 (정상)
+        INFO MyBatis mappers: external [file:./config/mapper/mysql/*.xml] -> 5 files
+
+        # 또는 fallback 시
+        INFO MyBatis mappers: classpath fallback [classpath:/mapper/mysql/*.xml] -> 5 files
+        ```
+
+        #### 운영 워크플로우
+
+        ```bash
+        # 1. 매퍼 수정
+        vi config/mapper/mysql/selectQuery.xml
+
+        # 2. 재시작 (변경사항 반영)
+        ./stop.sh
+        ./start.sh multi
+        ```
+
+        > ※ 핫 리로드는 지원하지 않습니다. 변경 후 반드시 재시작하세요.
+
+        > ⚠️ XML 문법 오류가 있으면 기동에 실패합니다. 변경 후 반드시 시작 로그에서 매퍼 로드 결과를 확인하세요.
+
+        ### 2-3. auth 폴더
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - auth 폴더 내부.png" alt="auth 폴더 내부">
-            <div class="screenshot-caption">그림 3. auth 폴더 내부 (.cert 인증파일)</div>
+            <div class="screenshot-caption">그림 5. auth 폴더 내부 (.cert 인증파일)</div>
         </div>
 
         KT 크로샷 세션 인증파일(`.cert`)을 보관합니다. 세션마다 다른 파일이 들어가며, 파일명은 `application-HA.yaml`의 `kt.sessions[].auth-file` 값과 정확히 일치해야 합니다.
 
         > ※ `.cert` 파일은 대소문자를 구분합니다. Linux 환경에서 특히 주의하세요.
+
+        ### 2-4. lib 폴더 — 외부 라이브러리
+
+        <div class="screenshot-figure">
+            <img src="./images/Odyssey 패키징 - 외부 lib.png" alt="lib 폴더 내부">
+            <div class="screenshot-caption">그림 6. lib 폴더 내부 (외부 라이브러리 약 130개)</div>
+        </div>
+
+        Spring Boot, JDBC 드라이버, Netty 등 모든 외부 라이브러리가 들어있습니다 (약 130개 `.jar`). `start.sh` 가 `-cp "lib/*"` 와일드카드로 자동 인식합니다.
+
+        #### DB 드라이버 교체 시나리오
+
+        고객사 DB가 MySQL 5.x인 경우, 기본 동봉된 드라이버를 5.x용으로 교체할 수 있습니다.
+
+        ```bash
+        # 1. 기본 드라이버 제거
+        cd /path/to/odyssey/lib
+        rm mysql-connector-j-*.jar
+
+        # 2. 호환 드라이버 추가
+        cp /tmp/mysql-connector-java-5.1.49.jar lib/
+
+        # 3. 재시작
+        ./stop.sh
+        ./start.sh multi
+        ```
+
+        > ※ **드라이버 교체 시 yaml도 함께 확인**해야 합니다. `driver-class-name` 과 `jdbc-url` 옵션이 버전마다 다릅니다 (아래 표 참고).
+
+        | 항목 | MySQL 8.x | MySQL 5.x |
+        |---|---|---|
+        | `driver-class-name` | `com.mysql.cj.jdbc.Driver` | `com.mysql.jdbc.Driver` |
+        | URL 옵션 차이 | `useSSL=false&allowPublicKeyRetrieval=true` | `useSSL=false&serverTimezone=Asia/Seoul` 등 |
+
+        다른 DBMS 드라이버(`postgresql-*.jar`, `mssql-jdbc-*.jar`, `mariadb-java-client-*.jar`, `ojdbc11-*.jar`)도 동일한 방식으로 교체할 수 있습니다.
+
+        > ※ `lib/` 안에는 **외부 라이브러리만** 들어있습니다. `odyssey-app-*.jar`, `odyssey-pipeline-*.jar` 같은 자사 코드는 패키지 루트에 위치하며, 임의로 변경하지 마세요.
+
+        ### 2-5. jre 폴더 — 번들 JRE
+
+        <div class="screenshot-figure">
+            <img src="./images/Odyssey 패키징 - jre.png" alt="jre 폴더 내부">
+            <div class="screenshot-caption">그림 7. jre 폴더 내부 (Java 21 LTS 번들)</div>
+        </div>
+
+        자체 동봉된 **Java 21 LTS** JRE 입니다. 기본적으로 Odyssey는 시스템에 설치된 자바와 **무관하게** 이 폴더의 JRE만으로 동작하며, 고객사가 Java 21 을 자체 운영하는 환경이라면 jre 폴더를 제거하여 시스템 Java 로 전환할 수도 있습니다.
+
+        #### Java 결정 우선순위
+
+        `start.sh` 는 기동 시 다음 순서로 사용할 Java 를 결정합니다.
+
+        | 순위 | 조건 | 사용 Java |
+        |---|---|---|
+        | 1 | `./jre/` 폴더 존재 + `./jre/bin/java` 실행 가능 | **번들 JRE** (`./jre/bin/java`) |
+        | 2 | `./jre/` 폴더 없음 + 시스템 PATH 에 `java` 존재 | **시스템 Java** (`java`) |
+        | 실패 | 둘 다 없음 또는 Java 21 미만 | 기동 거부 + 에러 안내 |
+
+        시작 시 다음과 같은 INFO 로그로 어느 Java 가 선택됐는지 확인할 수 있습니다.
+
+        ```text
+        # 번들 JRE 사용 시
+        INFO Java: ./jre/bin/java (bundled JRE (./jre))
+
+        # 시스템 Java 사용 시
+        INFO Java: java (system Java (PATH))
+        ```
+
+        #### 시스템 Java 사용 운영 패턴
+
+        고객사가 자체 Java 21 운영을 원하는 경우:
+
+        ```bash
+        # 패키지에서 jre 폴더만 제거 (다른 폴더 그대로)
+        rm -rf jre/
+
+        # 시스템 Java 21 확인
+        java -version
+        # → openjdk version "21.0.x" ... 또는 동등 버전
+
+        # 그대로 기동 — start.sh 가 시스템 Java 자동 사용
+        ./start.sh multi
+        ```
+
+        > ※ 시스템 Java 사용 시에도 **Java 21 이상이 필수**입니다 (Spring Boot 3.5.x 최소 요구사항). 미만 버전이면 `start.sh` 가 명확한 에러 메시지로 기동을 거부합니다.
+
+        #### 검증 명령
+
+        ```bash
+        # 번들 JRE 버전 확인 (jre/ 동봉 환경)
+        ./jre/bin/java -version
+        # → openjdk version "21.0.x" ...  (Linux x64)
+
+        # 실행 중인 프로세스가 어느 Java 로 떠 있는지 확인
+        ps -ef | grep odyssey
+        # → 번들 사용 시: 명령줄에 ./jre/bin/java 절대경로
+        # → 시스템 사용 시: 명령줄에 java (PATH 에서 해석됨)
+        ```
+
+        #### 첫 실행 전 — Linux 측 실행 비트 복원
+
+        패키지 전송 방식(scp, zip 압축 등)에 따라 실행 비트가 손실될 수 있습니다. 첫 실행 전 한 번 복원합니다.
+
+        ```bash
+        chmod -R +x jre/bin start.sh stop.sh
+        ```
+
+        > ※ 번들 JRE는 **Linux x64 (glibc)** 빌드입니다. Windows 환경 인스톨러는 별도 작업으로 진행 예정이며 (현재 매뉴얼 [4장 실행 / 정지](#4-실행--정지)의 Windows 섹션 참고), 인스톨러 배포 후 본 매뉴얼이 갱신됩니다.
 
         ---
 
@@ -972,11 +1141,11 @@
 
         ## 4. 실행 / 정지
 
-        배포 패키지에는 사전 빌드된 실행 JAR(`odyssey-app-1.0.0.jar`, `odyssey-pipeline-1.0.0-boot.jar`)이 포함되어 있으므로, 별도 빌드 없이 바로 기동할 수 있습니다.
+        배포 패키지에는 사전 빌드된 thin jar(`odyssey-app-1.0.0.jar`, `odyssey-pipeline-1.0.0.jar`)와 번들 JRE(`jre/`), 외부 라이브러리(`lib/`)가 포함되어 있어, 별도 빌드 없이 바로 기동할 수 있습니다.
 
         ### Linux
 
-        Odyssey 설치 폴더에서 다음 명령을 실행합니다.
+        Odyssey 설치 폴더에서 다음 명령을 실행합니다. `start.sh` 는 자동으로 적절한 Java 를 선택하고(`jre/` 동봉 시 번들 JRE, 미동봉 시 시스템 Java 21) 외부 `lib/` 를 classpath 와일드카드로 인식합니다 — 어느 쪽이든 운영자가 별도 설정할 것은 없습니다 (자세히는 [2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre) 참고).
 
         ```bash
         # 시작 — multi 모드 (엔진 + Web UI)
@@ -992,25 +1161,23 @@
         ./stop.sh all force
         ```
 
+        > ※ 첫 실행 전 한 번만 실행 비트 복원: `chmod +x start.sh stop.sh` (번들 JRE 동봉 시 `chmod -R +x jre/bin` 도 함께 실행)
+
         ### Windows
 
-        현재는 JAR을 `java -jar`로 직접 실행합니다.
-
-        ```bat
-        :: multi 모드 (엔진 + Web UI)
-        java -Xms256m -Xmx512m -server -XX:+UseG1GC -jar odyssey-app-1.0.0.jar --spring.profiles.active=HA
-
-        :: pipeline 모드 (엔진 단독)
-        java -Xms256m -Xmx512m -server -XX:+UseG1GC -jar odyssey-pipeline-1.0.0-boot.jar --spring.profiles.active=HA
-        ```
-
-        > ※ 추후 Windows 전용 인스톨러로 배포 방식이 변경될 예정이며, 인스톨러에서 `start.bat` / `stop.bat` 실행 스크립트를 함께 제공합니다. 인스톨러 배포 이후에는 위 `java -jar` 직접 실행 대신 제공된 bat 파일을 사용하게 됩니다.
+        > ⚠️ **별도 인스톨러로 배포 예정**
+        >
+        > 현재 배포 패키지의 번들 JRE는 Linux x64 빌드라 Windows 환경에서 직접 실행할 수 없습니다. Windows 환경 고객사를 위한 **별도 인스톨러**(Windows JRE 동봉 + `start.bat` / `stop.bat` 또는 Windows 서비스 등록)를 추후 작업 예정이며, 인스톨러 배포 후 본 매뉴얼이 갱신됩니다.
+        >
+        > 그 전까지 Windows 환경에서 임시로 동작 확인이 필요한 경우, 시스템에 Java 21 JDK 를 별도 설치하고 `java -cp "odyssey-app-1.0.0.jar;odyssey-pipeline-1.0.0.jar;lib/*" com.mono.odyssey.OdysseyApplication --spring.profiles.active=HA` 형태로 실행 가능하나, 정식 운영 환경 용도가 아닙니다.
 
         ### 정상 기동 확인
 
         `log/agent.log`(또는 모드별 `log/odyssey-app.out` / `log/odyssey-pipeline.out`)에 다음과 유사한 메시지가 출력됩니다.
 
         ```text
+        Java: ./jre/bin/java (bundled JRE (./jre))
+        MyBatis mappers: external [file:./config/mapper/mysql/*.xml] -> 5 files
         Database Driver Load Success.
         DBMS=[MySQL], URL=jdbc:mysql://**.**.**.**/****
         Mono Messaging Service agent=[Odyssey-1.0.0] starts.
@@ -1019,7 +1186,11 @@
         SendKT Thread Start
         ```
 
-        > ※ start.sh는 `--spring.profiles.active=HA`를 자동 적용하며, 작업 디렉토리 기준 `./config/application-HA.yaml`과 `./config/ha.properties`를 자동 로드합니다. 별도 인자 지정이 필요 없습니다.
+        > ※ 첫 줄 `Java: ...` 는 어느 Java 가 사용 중인지 알려줍니다. `./jre/bin/java (bundled JRE (./jre))` 또는 `java (system Java (PATH))` 두 형태가 정상입니다 ([2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre) 참고).
+
+        > ※ `MyBatis mappers: external ...` 행은 외부 폴더의 매퍼가 정상 로드됐다는 신호입니다. `classpath fallback` 으로 표시되면 `config/mapper/{dbms}/` 폴더가 비어있는지 확인하세요 ([2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화) 참고).
+
+        > ※ Poseidon 모니터링 미연동 환경에서는 시작 시 `Poseidon integration disabled` 한 줄이 INFO 로그에 출력됩니다 ([16장 Poseidon 모니터링 연동](#16-poseidon-모니터링-연동) 참고).
 
         ---
 
@@ -1031,11 +1202,11 @@
         http://[서버IP]:[포트]
         ```
 
-        기본 포트는 `application-HA.yaml`의 `server.port` 값(`7090`)입니다.
+        기본 포트는 `application-HA.yaml`의 `server.port` 값(`8090`)입니다.
 
         <div class="screenshot-figure">
             <img src="./images/01. 모니터링 화면.png" alt="모니터링 대시보드 — 실시간 발송 현황">
-            <div class="screenshot-caption">그림 4. 모니터링 대시보드 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
+            <div class="screenshot-caption">그림 8. 모니터링 대시보드 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
         </div>
 
         첫 화면은 **모니터링 대시보드**로, 파이프라인·큐 사이즈·TPS·CPU/메모리 게이지를 실시간으로 보여줍니다. 좌측 사이드바에서 데이터베이스·상세 설정·세션 설정·발송 금지 시간·로그·이중화 등 다른 화면으로 이동할 수 있습니다.
@@ -1841,7 +2012,13 @@
         | `poseidon.contact-email` | 장애 발생 시 연락받을 담당자 이메일. (고객사)|
         | `poseidon.heartbeat.interval-ms` | 하트비트 전송 주기. 기본 30,000 (30초). |
 
-        > ※ Poseidon 연동을 사용하지 않는 경우 본 영역을 주석 처리하거나 `url`, `auth-key`를 빈 값으로 두면 하트비트가 비활성화됩니다.
+        > ※ Poseidon 연동을 사용하지 않는 경우 본 영역을 통째로 주석 처리하거나 `url`, `auth-key`를 빈 값으로 두면 됩니다. 시작 시 아래와 같은 INFO 로그 한 줄이 찍히고 이후 하트비트·에러 보고·재전송 큐가 모두 비활성화됩니다.
+
+        ```text
+        INFO Poseidon integration disabled (poseidon.url not configured) — skipping start notification, heartbeat, error reporting
+        ```
+
+        미연동 상태에서는 외부 호출이 일절 발생하지 않으며 `~/.odyssey/retry-queue.jsonl` 같은 큐 파일도 생성되지 않습니다.
 
         > ※ Poseidon 연동을 사용하는 경우 **고객사 방화벽에 Poseidon 서버 IP를 등록**해 주셔야 합니다. Odyssey가 주기적으로 외부의 Poseidon
         클라우드(`poseidon.url` 항목에 명시된 호스트)로 HTTPS 요청(하트비트, 알림)을 송신해야 하므로 outbound 통신이 차단되어 있는 경우 연동이 동작하지 않습니다. 정확한 IP 및
@@ -1858,6 +2035,8 @@
         ## 17. 메시지 타입별 INSERT
 
         고객사 시스템에서 Odyssey 발송 테이블(기본 `ODYSSEY`)에 INSERT 함으로써 메시지가 발송됩니다. 아래는 메시지 종류별 INSERT 예제입니다.
+
+        > ※ Odyssey 내부에서 발송 테이블을 조회·갱신·이관하는 SELECT/UPDATE/DELETE 쿼리는 모두 외부 매퍼 폴더에 분리되어 있어 운영 중 직접 수정 가능합니다 — [2-2 config/mapper 폴더 — 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화) 참고.
 
         ### SMS 발송 (msg_type=1)
 
@@ -2317,7 +2496,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/01. 모니터링 화면.png" alt="모니터링 화면 — 실시간 발송 현황">
-            <div class="screenshot-caption">그림 5. 모니터링 화면 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
+            <div class="screenshot-caption">그림 9. 모니터링 화면 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
         </div>
 
         **② 발송 통계**
@@ -2330,7 +2509,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/01-1. 모니터링 화면 - 통계.png" alt="모니터링 화면 — 발송 통계">
-            <div class="screenshot-caption">그림 6. 모니터링 화면 — 발송 통계 (메시지 타입별 / 시간대별 / 템플릿별, CSV·Excel 내보내기)</div>
+            <div class="screenshot-caption">그림 10. 모니터링 화면 — 발송 통계 (메시지 타입별 / 시간대별 / 템플릿별, CSV·Excel 내보내기)</div>
         </div>
 
         > ※ 실시간 발송 현황은 WebSocket을 통해 실시간 갱신되며, 발송 통계는 약 14초 주기로 자동 갱신됩니다. 모니터링 화면 자체에서 설정을 변경하는 기능은 없습니다.
@@ -2346,7 +2525,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/02. 데이터베이스 화면.png" alt="데이터베이스 설정">
-            <div class="screenshot-caption">그림 7. 데이터베이스 설정 — 연결 정보 (DB 타입, JDBC URL, 사용자명)</div>
+            <div class="screenshot-caption">그림 11. 데이터베이스 설정 — 연결 정보 (DB 타입, JDBC URL, 사용자명)</div>
         </div>
 
         > ※ JDBC URL과 사용자명/비밀번호는 보안 정책에 따라 Web UI에서 수정할 수 없습니다. 변경이 필요한 경우 YAML 파일을 직접 편집하십시오.
@@ -2364,7 +2543,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/03. 상세 설정.png" alt="상세 설정 - 서비스 토글">
-            <div class="screenshot-caption">그림 8. 상세 설정 — 애플리케이션 설정, 메시지 전송 토글, RCS/Kakao 전송 설정</div>
+            <div class="screenshot-caption">그림 12. 상세 설정 — 애플리케이션 설정, 메시지 전송 토글, RCS/Kakao 전송 설정</div>
         </div>
 
         **사용자 옵션 영역**
@@ -2377,7 +2556,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/03-1. 상세 설정 - 사용자 설정.png" alt="상세 설정 - 사용자 옵션">
-            <div class="screenshot-caption">그림 9. 사용자 설정 — 타이밍, 디렉토리/인증, RCS 옵션</div>
+            <div class="screenshot-caption">그림 13. 사용자 설정 — 타이밍, 디렉토리/인증, RCS 옵션</div>
         </div>
 
         > ※ 설정 변경 후 "저장" 버튼을 클릭하면 사이드바에 변경 내역이 표시됩니다. 최종적으로 사이드바 하단의 **"설정 적용"** 버튼을 눌러야 Odyssey에 반영됩니다.
@@ -2395,22 +2574,22 @@
 
         <div class="screenshot-figure">
             <img src="./images/04. 세션 설정 - KT Xroshot.png" alt="세션 설정 - KT 크로샷">
-            <div class="screenshot-caption">그림 10. 세션 설정 — KT 크로샷 (SP ID, 접속 정보, SMS/LMS/MMS 토글)</div>
+            <div class="screenshot-caption">그림 14. 세션 설정 — KT 크로샷 (SP ID, 접속 정보, SMS/LMS/MMS 토글)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/04-1. 세션 설정 - RCS.png" alt="세션 설정 - KT RCS">
-            <div class="screenshot-caption">그림 11. 세션 설정 — KT RCS (Send/Auth URL, 인증 정보, Report Cycle)</div>
+            <div class="screenshot-caption">그림 15. 세션 설정 — KT RCS (Send/Auth URL, 인증 정보, Report Cycle)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/04-2. 세션 설 정- kakao.png" alt="세션 설정 - 카카오">
-            <div class="screenshot-caption">그림 12. 세션 설정 — 카카오 (엠앤와이즈 카카오 직접 연동)</div>
+            <div class="screenshot-caption">그림 16. 세션 설정 — 카카오 (엠앤와이즈 카카오 직접 연동)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/04-3. 세션 설정 - cpaas.png" alt="세션 설정 - CPaaS">
-            <div class="screenshot-caption">그림 13. 세션 설정 — CPaaS (KT CPaaS API)</div>
+            <div class="screenshot-caption">그림 17. 세션 설정 — CPaaS (KT CPaaS API)</div>
         </div>
 
         ### 발송 금지 시간
@@ -2423,7 +2602,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/05. 발송 금지 시간 설정.png" alt="발송 금지 시간 설정">
-            <div class="screenshot-caption">그림 14. 발송 금지 시간 설정 — 요일×시간 그리드 + 템플릿 관리</div>
+            <div class="screenshot-caption">그림 18. 발송 금지 시간 설정 — 요일×시간 그리드 + 템플릿 관리</div>
         </div>
 
         > ※ 설정값은 yaml이 아닌 `PAUSE_INFO` 테이블에 저장됩니다. 광고성 메시지는 정보통신망법에 따라 야간(21:00~08:00) 발송이 금지되어 있으므로 해당 시간대를 차단 설정해야 합니다.
@@ -2438,7 +2617,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/06. 로그 저장.png" alt="로그 관리">
-            <div class="screenshot-caption">그림 15. 로그 관리 — 날짜 필터, log/log_backup 디렉토리 탐색, 파일 선택 다운로드</div>
+            <div class="screenshot-caption">그림 19. 로그 관리 — 날짜 필터, log/log_backup 디렉토리 탐색, 파일 선택 다운로드</div>
         </div>
 
         ### 이중화 설정
@@ -2455,17 +2634,17 @@
 
         <div class="screenshot-figure">
             <img src="./images/07. 이중화설정 - SA.png" alt="이중화 설정 - Standalone 모드">
-            <div class="screenshot-caption">그림 16. 이중화 설정 — Standalone 모드 (부하 분산 · HA.PROPERTIES 비활성)</div>
+            <div class="screenshot-caption">그림 20. 이중화 설정 — Standalone 모드 (부하 분산 · HA.PROPERTIES 비활성)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/07-1. 이중화설정 - AA.png" alt="이중화 설정 - Active/Active 모드">
-            <div class="screenshot-caption">그림 17. 이중화 설정 — Active/Active 모드 (부하 분산 활성, Load Balance Ratio 조절 가능)</div>
+            <div class="screenshot-caption">그림 21. 이중화 설정 — Active/Active 모드 (부하 분산 활성, Load Balance Ratio 조절 가능)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/07-2. 이중화설정 - AS.png" alt="이중화 설정 - Active/Standby 모드">
-            <div class="screenshot-caption">그림 18. 이중화 설정 — Active/Standby 모드 (HA_AUTO_SWITCH 활성)</div>
+            <div class="screenshot-caption">그림 22. 이중화 설정 — Active/Standby 모드 (HA_AUTO_SWITCH 활성)</div>
         </div>
 
         > ※ HA 프로파일로 기동한 경우에만 본 메뉴가 활성화됩니다. AS/SA 프로파일에서는 메뉴가 표시되지 않거나 일부 옵션이 비활성화될 수 있습니다.
