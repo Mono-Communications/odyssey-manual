@@ -741,7 +741,7 @@
         |---|---|
         | **자바** | **Java 21 이상**. 기본 패키지에 Java 21 JRE 가 동봉되어 있어 별도 설치 없이 그대로 동작합니다. 고객사가 Java 21 을 자체 설치한 환경이라면 패키지에서 `jre/` 폴더를 제거하면 시스템 Java 로 자동 fallback 합니다 (자세히는 [2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre)) |
         | **DB** | MySQL 5.7 / 8.0 이상 (UTF-8 환경). 다른 DBMS 드라이버는 [2-4 lib 폴더](#2-4-lib-폴더-—-외부-라이브러리) 참고하여 교체 |
-        | **OS** | Linux x64 (glibc) — RHEL / Ubuntu / CentOS 등 일반 엔터프라이즈 배포판. Windows 환경은 별도 인스톨러로 배포 예정 ([4장 실행 / 정지](#4-실행--정지) 참고) |
+        | **OS** | **Linux x64 (glibc)** 또는 **Windows x64**. OS별 별도 zip 패키지 제공 — Linux 는 RHEL / Ubuntu / CentOS 등 일반 엔터프라이즈 배포판, Windows 는 Win10 / Server 2016 이상 (자세히는 [2 패키지 구성](#2-패키지-구성), [4장 실행 / 정지](#4-실행--정지)) |
         | **메모리** | 최소 1GB, 권장 2GB 이상 |
         | **네트워크** | DB 서버 접근, 게이트웨이 IP/PORT outbound 허용 ([21장 게이트웨이 IP / PORT](#21-게이트웨이-ip--port) 참고) |
 
@@ -756,12 +756,30 @@
         | **`multi`** (UI 포함) | `odyssey-app-1.0.0.jar` | Web UI를 통한 설정·모니터링·로그 관리가 필요한 일반 고객사 |
         | **`pipeline`** (엔진 단독) | `odyssey-pipeline-1.0.0.jar` | YAML로만 운영하며 Web UI가 필요하지 않은 고객사 |
 
+        ### Linux / Windows 패키지 구분
+
+        고객사 OS 에 따라 두 가지 zip 패키지 중 하나를 받습니다.
+
+        | 패키지 | 산출물 | OS 전용 추가 파일 |
+        |---|---|---|
+        | **Linux** | `odyssey-linux-1.0.0.zip` | `start.sh` / `stop.sh` |
+        | **Windows** | `odyssey-windows-1.0.0.zip` | `start.bat` / `stop.bat` / `installService.bat` / `unInstallService.bat` / `Odyssey.exe` / `Odyssey-multi.xml` / `Odyssey-pipeline.xml` |
+
+        공통 영역(`config/`, `lib/`, `auth/`, `upload/`, jar 2종) 은 두 패키지가 동일하고, **`jre/` 만 OS별 다른 빌드** (Linux x64 ELF / Windows x64 PE) 가 동봉됩니다.
+
         ### 패키지 폴더 구조
 
         <div class="screenshot-figure">
-            <img src="./images/Odyssey 패키징 구성.png" alt="Odyssey 패키지 구성">
-            <div class="screenshot-caption">그림 1. Odyssey 패키지 구성</div>
+            <img src="./images/Odyssey 패키징 구성.png" alt="Linux 패키지 구성">
+            <div class="screenshot-caption">그림 1. Linux 패키지 구성</div>
         </div>
+
+        <div class="screenshot-figure">
+            <img src="./images/Odyssey 패키징 구성_window.png" alt="Windows 패키지 구성">
+            <div class="screenshot-caption">그림 2. Windows 패키지 구성</div>
+        </div>
+
+        #### 공통 항목
 
         | 항목 | 설명 |
         |---|---|
@@ -771,11 +789,25 @@
         | `config/` | 환경설정 폴더 — `application-HA.yaml`, `ha.properties`, `mapper/` (자세히는 [2-1 config 폴더](#2-1-config-폴더), [2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화)) |
         | `auth/` | KT 크로샷 세션 인증파일(`.cert`) 폴더 |
         | `upload/` | RCS MMS 첨부 이미지 파일 폴더 (자동 업로드 사용 시) |
-        | `start.sh` / `stop.sh` | 시작 / 종료 스크립트 (Linux) |
-        | `log/` (자동 생성) | 실행 로그 폴더 — `agent.log`(전체 로그), `error.log`, `router.log` 등 모듈별 파일, `odyssey-app.out` 또는 `odyssey-pipeline.out`(JVM 콘솔 안전망) |
+        | `log/` (자동 생성) | 실행 로그 폴더 — `agent.log`(전체 로그), `error.log`, `router.log` 등 모듈별 파일 |
         | `pids/` (자동 생성) | 실행 중 프로세스 PID 파일 폴더 |
         | `log_backup/` (자동 생성) | 일별 압축 로그 백업 |
         | `backup/` (자동 생성) | Web UI 설정 변경 백업 |
+
+        #### Linux 전용
+
+        | 항목 | 설명 |
+        |---|---|
+        | `start.sh` / `stop.sh` | 시작 / 종료 스크립트 (자세히는 [4장 실행 / 정지](#4-실행--정지)) |
+
+        #### Windows 전용
+
+        | 항목 | 설명 |
+        |---|---|
+        | `start.bat` / `stop.bat` | 수동 실행 / 종료 스크립트 — 더블클릭 또는 cmd 에서 실행 (자세히는 [2-6 Windows 전용 파일](#2-6-windows-전용-파일)) |
+        | `installService.bat` / `unInstallService.bat` | Windows 서비스 등록 / 해제 — 24/7 운영 시 사용 |
+        | `Odyssey.exe` | WinSW (Windows Service Wrapper) — 서비스 등록의 wrapper 역할 |
+        | `Odyssey-multi.xml` / `Odyssey-pipeline.xml` | 서비스 모드별 설정 template — `installService.bat` 이 메뉴 선택에 따라 활성화 |
 
         > ※ 자사 코드 jar 는 본체만 포함된 작은 파일(수백 KB)이며, 실제 의존 라이브러리는 외부 `lib/` 폴더에서 로딩됩니다. 드라이버 등 라이브러리 교체 시 jar 재빌드 없이 lib/ 안의 jar 만 교체하면 됩니다.
 
@@ -783,7 +815,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - config 폴더 내부.png" alt="config 폴더 내부">
-            <div class="screenshot-caption">그림 2. config 폴더 내부 (application-HA.yaml + ha.properties + mapper/)</div>
+            <div class="screenshot-caption">그림 3. config 폴더 내부 (application-HA.yaml + ha.properties + mapper/)</div>
         </div>
 
         | 항목 | 역할 |
@@ -798,14 +830,14 @@
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - config 폴더 내부 - dbms.png" alt="config/mapper/{dbms}/ 구성">
-            <div class="screenshot-caption">그림 3. config/mapper/&#123;dbms&#125;/ 구성 (현재 mysql 지원)</div>
+            <div class="screenshot-caption">그림 4. config/mapper/&#123;dbms&#125;/ 구성 (현재 mysql 지원)</div>
         </div>
 
         DBMS별 폴더 안에 5종의 매퍼 파일이 있습니다.
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - config 폴더 내부 - dbms - 쿼리.png" alt="DBMS 폴더 내부 매퍼 파일">
-            <div class="screenshot-caption">그림 4. DBMS 폴더 내부 매퍼 파일 5종</div>
+            <div class="screenshot-caption">그림 5. DBMS 폴더 내부 매퍼 파일 5종</div>
         </div>
 
         | 파일 | 역할 |
@@ -852,7 +884,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - auth 폴더 내부.png" alt="auth 폴더 내부">
-            <div class="screenshot-caption">그림 5. auth 폴더 내부 (.cert 인증파일)</div>
+            <div class="screenshot-caption">그림 6. auth 폴더 내부 (.cert 인증파일)</div>
         </div>
 
         KT 크로샷 세션 인증파일(`.cert`)을 보관합니다. 세션마다 다른 파일이 들어가며, 파일명은 `application-HA.yaml`의 `kt.sessions[].auth-file` 값과 정확히 일치해야 합니다.
@@ -863,7 +895,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - 외부 lib.png" alt="lib 폴더 내부">
-            <div class="screenshot-caption">그림 6. lib 폴더 내부 (외부 라이브러리 약 130개)</div>
+            <div class="screenshot-caption">그림 7. lib 폴더 내부 (외부 라이브러리 약 130개)</div>
         </div>
 
         Spring Boot, JDBC 드라이버, Netty 등 모든 외부 라이브러리가 들어있습니다 (약 130개 `.jar`). `start.sh` 가 `-cp "lib/*"` 와일드카드로 자동 인식합니다.
@@ -900,7 +932,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/Odyssey 패키징 - jre.png" alt="jre 폴더 내부">
-            <div class="screenshot-caption">그림 7. jre 폴더 내부 (Java 21 LTS 번들)</div>
+            <div class="screenshot-caption">그림 8. jre 폴더 내부 (Java 21 LTS 번들)</div>
         </div>
 
         자체 동봉된 **Java 21 LTS** JRE 입니다. 기본적으로 Odyssey는 시스템에 설치된 자바와 **무관하게** 이 폴더의 JRE만으로 동작하며, 고객사가 Java 21 을 자체 운영하는 환경이라면 jre 폴더를 제거하여 시스템 Java 로 전환할 수도 있습니다.
@@ -964,7 +996,23 @@
         chmod -R +x jre/bin start.sh stop.sh
         ```
 
-        > ※ 번들 JRE는 **Linux x64 (glibc)** 빌드입니다. Windows 환경 인스톨러는 별도 작업으로 진행 예정이며 (현재 매뉴얼 [4장 실행 / 정지](#4-실행--정지)의 Windows 섹션 참고), 인스톨러 배포 후 본 매뉴얼이 갱신됩니다.
+        > ※ 번들 JRE는 OS별 다른 빌드입니다 — Linux 패키지에는 Linux x64 (glibc), Windows 패키지에는 Windows x64 (PE32+) 가 동봉됩니다. 폴더명(`jre/`)은 동일하지만 내부 바이너리는 OS 전용이라 서로 호환되지 않습니다.
+
+        ### 2-6. Windows 전용 파일
+
+        Windows 패키지에는 운영자가 직접 사용하는 4개 .bat 와, Windows 서비스 등록 시 자동으로 사용되는 wrapper 파일들이 들어있습니다.
+
+        | 파일 | 역할 | 직접 실행/편집 |
+        |---|---|---|
+        | `start.bat` / `stop.bat` | 수동 실행 / 정지 (Linux `start.sh` / `stop.sh` 와 1:1 대응) | ✅ 사용 |
+        | `installService.bat` / `unInstallService.bat` | Windows 서비스 등록 / 해제 (UAC 자동 요청, 메뉴로 multi/pipeline 선택) | ✅ 사용 |
+        | `Odyssey.exe` | WinSW (Windows Service Wrapper) — 서비스에 등록되는 실행 파일 | ❌ |
+        | `Odyssey-multi.xml` / `Odyssey-pipeline.xml` | 모드별 서비스 설정 template | ❌ |
+        | `Odyssey.xml` (자동 생성) | active 서비스 설정 — `installService.bat` 시 동적 생성, `unInstallService.bat` 시 자동 삭제 | ❌ |
+
+        > ⚠️ `Odyssey.exe`, `Odyssey*.xml` 은 `installService.bat` 가 자동으로 처리하는 내부 파일입니다. **운영자/고객지원팀이 직접 실행하거나 편집할 필요가 없습니다.**
+
+        실제 운영 시나리오와 명령은 [4장 실행 / 정지](#4-실행--정지) 참고.
 
         ---
 
@@ -1165,11 +1213,44 @@
 
         ### Windows
 
-        > ⚠️ **별도 인스톨러로 배포 예정**
-        >
-        > 현재 배포 패키지의 번들 JRE는 Linux x64 빌드라 Windows 환경에서 직접 실행할 수 없습니다. Windows 환경 고객사를 위한 **별도 인스톨러**(Windows JRE 동봉 + `start.bat` / `stop.bat` 또는 Windows 서비스 등록)를 추후 작업 예정이며, 인스톨러 배포 후 본 매뉴얼이 갱신됩니다.
-        >
-        > 그 전까지 Windows 환경에서 임시로 동작 확인이 필요한 경우, 시스템에 Java 21 JDK 를 별도 설치하고 `java -cp "odyssey-app-1.0.0.jar;odyssey-pipeline-1.0.0.jar;lib/*" com.mono.odyssey.OdysseyApplication --spring.profiles.active=HA` 형태로 실행 가능하나, 정식 운영 환경 용도가 아닙니다.
+        Windows 패키지는 두 가지 운영 모드를 제공합니다 — **수동 실행** (테스트/임시) 과 **Windows 서비스 등록** (24/7 운영, 권장).
+
+        #### 수동 실행
+
+        cmd 또는 탐색기 더블클릭으로 실행. 사용자 로그인 세션에 묶여 있어 로그아웃 시 종료됩니다.
+
+        ```cmd
+        start.bat                    :: 메뉴로 multi/pipeline 선택
+        start.bat multi              :: 또는 인자로 직접
+        stop.bat                     :: 모두 정지
+        ```
+
+        #### Windows 서비스 등록 (24/7 운영)
+
+        `installService.bat` 더블클릭(또는 cmd 실행) → UAC 권한 자동 요청 → 메뉴에서 모드 선택 → **서비스 등록 + 시작이 한 번에 처리됩니다.** 부팅 시 자동 시작 + 죽으면 자동 재시작 + 사용자 로그아웃 무관 동작.
+
+        <div class="screenshot-figure">
+            <img src="./images/Odyssey 패키징 - window installer.png" alt="installService.bat 실행 화면">
+            <div class="screenshot-caption">그림 24. installService.bat 실행 — 모드 선택 후 서비스 자동 등록 + 시작</div>
+        </div>
+
+        ```cmd
+        installService.bat           :: 메뉴로 multi/pipeline 선택
+        installService.bat multi     :: 또는 인자로 직접
+        unInstallService.bat         :: 서비스 정지 + 등록 해제
+        ```
+
+        등록 후 운영:
+
+        ```cmd
+        sc query Odyssey             :: 상태 확인
+        net stop Odyssey             :: 정지
+        net start Odyssey            :: 시작
+        ```
+
+        또는 `services.msc` 에서 "Odyssey" 항목 우클릭으로 GUI 조작 가능.
+
+        > ⚠️ 수동 모드와 서비스 모드를 동시에 실행하지 마세요 (포트/DB 락 충돌). 한 모드만 골라 운영. 설치 경로는 한글/공백 없는 영문(예: `C:\Odyssey\`) 권장.
 
         ### 정상 기동 확인
 
@@ -1186,11 +1267,7 @@
         SendKT Thread Start
         ```
 
-        > ※ 첫 줄 `Java: ...` 는 어느 Java 가 사용 중인지 알려줍니다. `./jre/bin/java (bundled JRE (./jre))` 또는 `java (system Java (PATH))` 두 형태가 정상입니다 ([2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre) 참고).
-
-        > ※ `MyBatis mappers: external ...` 행은 외부 폴더의 매퍼가 정상 로드됐다는 신호입니다. `classpath fallback` 으로 표시되면 `config/mapper/{dbms}/` 폴더가 비어있는지 확인하세요 ([2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화) 참고).
-
-        > ※ Poseidon 모니터링 미연동 환경에서는 시작 시 `Poseidon integration disabled` 한 줄이 INFO 로그에 출력됩니다 ([16장 Poseidon 모니터링 연동](#16-poseidon-모니터링-연동) 참고).
+        > ※ 시작 로그의 핵심 줄 — `Java: ...` (어느 Java 사용 중), `MyBatis mappers: external ...` (외부 매퍼 정상 로드), `Poseidon integration disabled` (Poseidon 미연동 환경에서만, 정상). 자세히는 [2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre), [2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화), [16장 Poseidon](#16-poseidon-모니터링-연동) 참고.
 
         ---
 
@@ -1206,7 +1283,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/01. 모니터링 화면.png" alt="모니터링 대시보드 — 실시간 발송 현황">
-            <div class="screenshot-caption">그림 8. 모니터링 대시보드 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
+            <div class="screenshot-caption">그림 9. 모니터링 대시보드 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
         </div>
 
         첫 화면은 **모니터링 대시보드**로, 파이프라인·큐 사이즈·TPS·CPU/메모리 게이지를 실시간으로 보여줍니다. 좌측 사이드바에서 데이터베이스·상세 설정·세션 설정·발송 금지 시간·로그·이중화 등 다른 화면으로 이동할 수 있습니다.
@@ -2496,7 +2573,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/01. 모니터링 화면.png" alt="모니터링 화면 — 실시간 발송 현황">
-            <div class="screenshot-caption">그림 9. 모니터링 화면 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
+            <div class="screenshot-caption">그림 10. 모니터링 화면 — 실시간 발송 현황 (파이프라인, 큐 사이즈, TPS, 리소스 게이지)</div>
         </div>
 
         **② 발송 통계**
@@ -2509,7 +2586,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/01-1. 모니터링 화면 - 통계.png" alt="모니터링 화면 — 발송 통계">
-            <div class="screenshot-caption">그림 10. 모니터링 화면 — 발송 통계 (메시지 타입별 / 시간대별 / 템플릿별, CSV·Excel 내보내기)</div>
+            <div class="screenshot-caption">그림 11. 모니터링 화면 — 발송 통계 (메시지 타입별 / 시간대별 / 템플릿별, CSV·Excel 내보내기)</div>
         </div>
 
         > ※ 실시간 발송 현황은 WebSocket을 통해 실시간 갱신되며, 발송 통계는 약 14초 주기로 자동 갱신됩니다. 모니터링 화면 자체에서 설정을 변경하는 기능은 없습니다.
@@ -2525,7 +2602,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/02. 데이터베이스 화면.png" alt="데이터베이스 설정">
-            <div class="screenshot-caption">그림 11. 데이터베이스 설정 — 연결 정보 (DB 타입, JDBC URL, 사용자명)</div>
+            <div class="screenshot-caption">그림 12. 데이터베이스 설정 — 연결 정보 (DB 타입, JDBC URL, 사용자명)</div>
         </div>
 
         > ※ JDBC URL과 사용자명/비밀번호는 보안 정책에 따라 Web UI에서 수정할 수 없습니다. 변경이 필요한 경우 YAML 파일을 직접 편집하십시오.
@@ -2543,7 +2620,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/03. 상세 설정.png" alt="상세 설정 - 서비스 토글">
-            <div class="screenshot-caption">그림 12. 상세 설정 — 애플리케이션 설정, 메시지 전송 토글, RCS/Kakao 전송 설정</div>
+            <div class="screenshot-caption">그림 13. 상세 설정 — 애플리케이션 설정, 메시지 전송 토글, RCS/Kakao 전송 설정</div>
         </div>
 
         **사용자 옵션 영역**
@@ -2556,7 +2633,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/03-1. 상세 설정 - 사용자 설정.png" alt="상세 설정 - 사용자 옵션">
-            <div class="screenshot-caption">그림 13. 사용자 설정 — 타이밍, 디렉토리/인증, RCS 옵션</div>
+            <div class="screenshot-caption">그림 14. 사용자 설정 — 타이밍, 디렉토리/인증, RCS 옵션</div>
         </div>
 
         > ※ 설정 변경 후 "저장" 버튼을 클릭하면 사이드바에 변경 내역이 표시됩니다. 최종적으로 사이드바 하단의 **"설정 적용"** 버튼을 눌러야 Odyssey에 반영됩니다.
@@ -2574,22 +2651,22 @@
 
         <div class="screenshot-figure">
             <img src="./images/04. 세션 설정 - KT Xroshot.png" alt="세션 설정 - KT 크로샷">
-            <div class="screenshot-caption">그림 14. 세션 설정 — KT 크로샷 (SP ID, 접속 정보, SMS/LMS/MMS 토글)</div>
+            <div class="screenshot-caption">그림 15. 세션 설정 — KT 크로샷 (SP ID, 접속 정보, SMS/LMS/MMS 토글)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/04-1. 세션 설정 - RCS.png" alt="세션 설정 - KT RCS">
-            <div class="screenshot-caption">그림 15. 세션 설정 — KT RCS (Send/Auth URL, 인증 정보, Report Cycle)</div>
+            <div class="screenshot-caption">그림 16. 세션 설정 — KT RCS (Send/Auth URL, 인증 정보, Report Cycle)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/04-2. 세션 설 정- kakao.png" alt="세션 설정 - 카카오">
-            <div class="screenshot-caption">그림 16. 세션 설정 — 카카오 (엠앤와이즈 카카오 직접 연동)</div>
+            <div class="screenshot-caption">그림 17. 세션 설정 — 카카오 (엠앤와이즈 카카오 직접 연동)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/04-3. 세션 설정 - cpaas.png" alt="세션 설정 - CPaaS">
-            <div class="screenshot-caption">그림 17. 세션 설정 — CPaaS (KT CPaaS API)</div>
+            <div class="screenshot-caption">그림 18. 세션 설정 — CPaaS (KT CPaaS API)</div>
         </div>
 
         ### 발송 금지 시간
@@ -2602,7 +2679,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/05. 발송 금지 시간 설정.png" alt="발송 금지 시간 설정">
-            <div class="screenshot-caption">그림 18. 발송 금지 시간 설정 — 요일×시간 그리드 + 템플릿 관리</div>
+            <div class="screenshot-caption">그림 19. 발송 금지 시간 설정 — 요일×시간 그리드 + 템플릿 관리</div>
         </div>
 
         > ※ 설정값은 yaml이 아닌 `PAUSE_INFO` 테이블에 저장됩니다. 광고성 메시지는 정보통신망법에 따라 야간(21:00~08:00) 발송이 금지되어 있으므로 해당 시간대를 차단 설정해야 합니다.
@@ -2617,7 +2694,7 @@
 
         <div class="screenshot-figure">
             <img src="./images/06. 로그 저장.png" alt="로그 관리">
-            <div class="screenshot-caption">그림 19. 로그 관리 — 날짜 필터, log/log_backup 디렉토리 탐색, 파일 선택 다운로드</div>
+            <div class="screenshot-caption">그림 20. 로그 관리 — 날짜 필터, log/log_backup 디렉토리 탐색, 파일 선택 다운로드</div>
         </div>
 
         ### 이중화 설정
@@ -2634,17 +2711,17 @@
 
         <div class="screenshot-figure">
             <img src="./images/07. 이중화설정 - SA.png" alt="이중화 설정 - Standalone 모드">
-            <div class="screenshot-caption">그림 20. 이중화 설정 — Standalone 모드 (부하 분산 · HA.PROPERTIES 비활성)</div>
+            <div class="screenshot-caption">그림 21. 이중화 설정 — Standalone 모드 (부하 분산 · HA.PROPERTIES 비활성)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/07-1. 이중화설정 - AA.png" alt="이중화 설정 - Active/Active 모드">
-            <div class="screenshot-caption">그림 21. 이중화 설정 — Active/Active 모드 (부하 분산 활성, Load Balance Ratio 조절 가능)</div>
+            <div class="screenshot-caption">그림 22. 이중화 설정 — Active/Active 모드 (부하 분산 활성, Load Balance Ratio 조절 가능)</div>
         </div>
 
         <div class="screenshot-figure">
             <img src="./images/07-2. 이중화설정 - AS.png" alt="이중화 설정 - Active/Standby 모드">
-            <div class="screenshot-caption">그림 22. 이중화 설정 — Active/Standby 모드 (HA_AUTO_SWITCH 활성)</div>
+            <div class="screenshot-caption">그림 23. 이중화 설정 — Active/Standby 모드 (HA_AUTO_SWITCH 활성)</div>
         </div>
 
         > ※ HA 프로파일로 기동한 경우에만 본 메뉴가 활성화됩니다. AS/SA 프로파일에서는 메뉴가 표시되지 않거나 일부 옵션이 비활성화될 수 있습니다.
