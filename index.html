@@ -779,12 +779,15 @@
             <div class="screenshot-caption">그림 2. Windows 패키지 구성</div>
         </div>
 
+        > ※ 위 패키지 구성 그림은 이전 버전 캡처입니다. 현재 패키지에는 운영 모니터링용 `libs/` 폴더가 추가되어 있습니다 ([2-7 libs 폴더](#2-7-libs-폴더-—-네이티브-모니터링-라이브러리) 참고).
+
         #### 공통 항목
 
         | 항목 | 설명 |
         |---|---|
         | `odyssey-app-1.0.0.jar` / `odyssey-pipeline-1.0.0.jar` | 자사 코드 (thin jar — 외부 lib/ 와 함께 동작) |
         | `lib/` | 외부 라이브러리 폴더 — Spring Boot, JDBC 드라이버, Netty 등 (자세히는 [2-4 lib 폴더](#2-4-lib-폴더-—-외부-라이브러리)) |
+        | `libs/` | 운영 모니터링 네이티브 라이브러리 폴더 — `cypher.dll`(Windows) / `libcypher.so`(Linux) (자세히는 [2-7 libs 폴더](#2-7-libs-폴더-—-네이티브-모니터링-라이브러리)) |
         | `jre/` | 번들 Java 21 JRE — 시스템 자바와 무관하게 동작 (자세히는 [2-5 jre 폴더](#2-5-jre-폴더-—-번들-jre)) |
         | `config/` | 환경설정 폴더 — `application-HA.yaml`, `ha.properties`, `mapper/` (자세히는 [2-1 config 폴더](#2-1-config-폴더), [2-2 매퍼 외부화](#2-2-configmapper-폴더-—-매퍼-외부화)) |
         | `auth/` | KT 크로샷 세션 인증파일(`.cert`) 폴더 |
@@ -1013,6 +1016,19 @@
         > ⚠️ `Odyssey.exe`, `Odyssey*.xml` 은 `installService.bat` 가 자동으로 처리하는 내부 파일입니다. **운영자/고객지원팀이 직접 실행하거나 편집할 필요가 없습니다.**
 
         실제 운영 시나리오와 명령은 [4장 실행 / 정지](#4-실행--정지) 참고.
+
+        ### 2-7. libs 폴더 — 네이티브 모니터링 라이브러리
+
+        운영 모니터링용 네이티브 라이브러리가 들어있는 폴더입니다. OS별로 다른 바이너리가 동봉됩니다.
+
+        | 파일 | OS |
+        |---|---|
+        | `cypher.dll` | Windows x64 |
+        | `libcypher.so` | Linux x64 |
+
+        start 스크립트(및 Windows 서비스)가 이 폴더를 통해 라이브러리를 로딩합니다. **폴더와 파일을 삭제하거나 다른 위치로 옮기지 마세요.** 없어도 메시지 발송 기능 자체는 정상 동작하지만, 운영 모니터링 신호가 수집되지 않습니다.
+
+        > ※ `jre/` 와 마찬가지로 OS 전용 바이너리입니다. Linux 패키지에는 `libcypher.so`, Windows 패키지에는 `cypher.dll` 만 동봉됩니다.
 
         ---
 
