@@ -2084,8 +2084,7 @@
 
         ## 16. Poseidon 모니터링 연동
 
-        **Poseidon**은 ㈜모노커뮤니케이션즈가 운영하는 통합 모니터링 플랫폼입니다. Odyssey HA 프로파일은 Poseidon 클라우드와 연동하여 인스턴스 상태, 시작/종료 알림, 에러 알림, KT
-        사용량 등을 주기적으로 보고합니다.
+        **Poseidon**은 ㈜모노커뮤니케이션즈가 운영하는 통합 모니터링 플랫폼입니다. Odyssey HA 프로파일은 Poseidon 클라우드와 연동하여 인스턴스 상태, 시작/종료 알림, 하트비트, 에러 보고 등을 주기적으로 전송합니다. 운영 에러는 `libs/` 의 모니터링 네이티브 라이브러리를 통해 보고됩니다 ([2-7 libs 폴더](#2-7-libs-폴더-—-네이티브-모니터링-라이브러리) 참고).
 
         ```yaml
         poseidon:
@@ -2103,13 +2102,13 @@
         | `poseidon.contact-email` | 장애 발생 시 연락받을 담당자 이메일. (고객사)|
         | `poseidon.heartbeat.interval-ms` | 하트비트 전송 주기. 기본 30,000 (30초). |
 
-        > ※ Poseidon 연동을 사용하지 않는 경우 본 영역을 통째로 주석 처리하거나 `url`, `auth-key`를 빈 값으로 두면 됩니다. 시작 시 아래와 같은 INFO 로그 한 줄이 찍히고 이후 하트비트·에러 보고·재전송 큐가 모두 비활성화됩니다.
+        > ※ Poseidon 연동을 사용하지 않는 경우 본 영역을 통째로 주석 처리하거나 `url`, `auth-key`를 빈 값으로 두면 됩니다. 시작 시 아래와 같은 INFO 로그 한 줄이 찍히고 이후 하트비트·에러 보고가 모두 비활성화됩니다.
 
         ```text
         INFO Poseidon integration disabled (poseidon.url not configured) — skipping start notification, heartbeat, error reporting
         ```
 
-        미연동 상태에서는 외부 호출이 일절 발생하지 않으며 `~/.odyssey/retry-queue.jsonl` 같은 큐 파일도 생성되지 않습니다.
+        미연동 상태에서는 Poseidon 으로의 외부 호출이 일절 발생하지 않습니다.
 
         > ※ Poseidon 연동을 사용하는 경우 **고객사 방화벽에 Poseidon 서버 IP를 등록**해 주셔야 합니다. Odyssey가 주기적으로 외부의 Poseidon
         클라우드(`poseidon.url` 항목에 명시된 호스트)로 HTTPS 요청(하트비트, 알림)을 송신해야 하므로 outbound 통신이 차단되어 있는 경우 연동이 동작하지 않습니다. 정확한 IP 및
